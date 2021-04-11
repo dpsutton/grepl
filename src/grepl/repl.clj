@@ -24,7 +24,7 @@
                            (mapcat (partial walk id) (if (map? node) (concat (keys node) (vals node))
                                                          (seq node))))))))
         walked (walk -1 form)]
-    (concat (map #(dissoc % :grepl/parent :grep/root) walked)
+    (concat (map #(dissoc % :grepl/parent :grepl/root) walked)
             (mapcat (fn [node] [[:db/add (:db/id node) :grepl/parent (:grepl/parent node)]
                                 [:db/add (:db/id node) :grepl/root -1]])
                     walked))))
