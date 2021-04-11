@@ -3,24 +3,22 @@
 A way to grep your repl. It stores all repl forms in [asami](https://github.com/threatgrid/asami). You can search the repl history for forms, returning either the parent containing form or the entire (root) form.
 
 ```clojure
-grepl.repl=> (let [c 2 d 4] (+ c d))  ;; enter a form at the repl
-6
-grepl.repl=> (:grepl/parent d)        ;; query for the parents of d, of which there are two
-[c 2 d 4]
-(+ c d)
+user=> (require '[grepl.repl :as grepl])
 nil
-grepl.repl=> (:grepl/root d)          ;; query for the root form, of which there is one
-(let [c 2 d 4] (+ c d))
+user=> (grepl/grepl)
+user=> (let [f inc] (f 4))
+5
+user=> (:grepl/parent f)
+[f inc]
+(f 4)
 nil
+user=> (:grepl/root f)
+(let [f inc] (f 4))
+nil
+user=> :repl/quit
+nil
+user=>
 ```
-
-### to use
-
-```clojure
-(require '[grepl.repl :as grepl])
-(grepl/grepl)
-```
-
 To exit, just type `:repl/quit`.
 
 ## Data storage
