@@ -3,7 +3,8 @@
             [clojure.edn :as edn]
             [clojure.pprint :refer (pprint)]
             clojure.main
-            clojure.core.server))
+            clojure.core.server)
+  (:import java.util.regex.Pattern))
 
 (def db-uri "asami:mem://grepl")
 (d/create-database db-uri)
@@ -48,20 +49,18 @@
        db
        (pr-str form)))
 
-(comment
-  (let [form 'le
-        db (d/db conn)]
-    (->> (d/q '[:find [?root-form ...]
-                :in $ ?regex
-                :where
-                [?e :grepl/form ?form]
-                [(re-find ?regex ?form)]
-                [?e :grepl/root ?root]
-                [?root :grepl/form ?root-form]]
-              db
-              (re-pattern (pr-str form)))
-         (map (fn [x] (try (edn/read-string x) (catch Throwable _ x))))
-         (run! pprint))))
+(defn root%-of [db form]
+  (d/q '[:find [?root-form ...]
+         :in $ ?regex
+         :where
+         [?e :grepl/form ?form]
+         [(re-find ?regex ?form)]
+         [?e :grepl/root ?root]
+         [?root :grepl/form ?root-form]]
+       db
+       (if (instance? Pattern form)
+         form
+         (re-pattern (pr-str form)))))
 
 (defn parent-of [db form]
   (d/q '[:find [?parent-form ...]
@@ -72,6 +71,20 @@
          [?parent :grepl/form ?parent-form]]
        db
        (pr-str form)))
+
+(defn parent%-of
+  [db form]
+  (d/q '[:find [?parent-form ...]
+         :in $ ?regex
+         :where
+         [?e :grepl/form ?form]
+         [(re-find ?regex ?form)]
+         [?e :grepl/parent ?parent]
+         [?parent :grepl/form ?parent-form]]
+       db
+       (if (instance? Pattern form)
+         form
+         (re-pattern (pr-str form)))))
 
 (def results-xf (map (fn [x] (try (edn/read-string x) (catch Throwable _ x)))))
 
@@ -88,46 +101,59 @@
   (require '[vlaaad.reveal :as reveal])
   (add-tap (reveal/ui))
 
-  (clojure.main/repl
-    :eval (fn [form]
-            (if (and (sequential? form)
-                     (keyword? (first form))
-                     (#{"grepl"} (namespace (first form))))
-              (let [db (d/db conn)]
-                (case (first form)
-                  :grepl/root (pprint-results (root-of db (second form)))
-                  :grepl/parent (pprint-results (parent-of db (second form)))))
-              (do (d/transact conn {:tx-data (->tx-data form)})
-                  (eval form))))
-                                        ; :prompt (fn [] (printf "history aware> "))
-    :read clojure.core.server/repl-read))
+  )
 
 (defn grepl
-  "Start a clojure.main/repl which stores repl history in the graph
-  database asami. To search for the history, type `(:grepl/parent
-  <form>)` or `(:grepl/root <form>)`. There is no need to quote forms
-  to prevent evaluation.
+  "Start a `clojure.main/repl` which stores repl history in the graph
+  database asami. To search for the history, type `(?grepl/parent
+  <form>)` or `(?grepl/root <form>)`. There is no need to quote forms
+  to prevent evaluation. To search for partial matches append a % at the end:
+
+  (?grepl/root% le)
+  (?grepl/parent% le) ;; le for a partial match on let
+
+  Or use a regex for fine control
+
+  (?grepl/root% #\"le\")
 
   Example:
-  grepl.repl=> (let [c 2 d 4] (+ c d))  ;; enter a form at the repl
+  user=> (let [c 2 d 4] (+ c d))  ;; enter a form at the repl
   6
-  grepl.repl=> (:grepl/parent d)        ;; query for the parents of d, of which there are two
+  user=> (?grepl/parent d)        ;; query for the parents of d, of which there are two
   [c 2 d 4]
   (+ c d)
   nil
-  grepl.repl=> (:grepl/root d)          ;; query for the root form, of which there is one
+  user=> (?grepl/root d)          ;; query for the root form, of which there is one
   (let [c 2 d 4] (+ c d))
   nil"
   []
   (clojure.main/repl
     :eval (fn [form]
             (if (and (sequential? form)
-                     (keyword? (first form))
-                     (#{"grepl"} (namespace (first form))))
+                     (symbol (first form))
+                     (#{"?grepl"} (namespace (first form))))
               (let [db (d/db conn)]
                 (case (first form)
-                  :grepl/root (pprint-results (root-of db (second form)))
-                  :grepl/parent (pprint-results (parent-of db (second form)))))
+                  ?grepl/root    (pprint-results (root-of db (second form)))
+                  ?grepl/root%   (pprint-results (root%-of db (second form)))
+                  ?grepl/parent  (pprint-results (parent-of db (second form)))
+                  ?grepl/parent% (pprint-results (parent%-of db (second form)))
+                  ?grepl/reset   (do (d/delete-database db-uri)
+                                     (alter-var-root #'conn (constantly (d/connect db-uri)))
+                                     true)))
               (do (d/transact conn {:tx-data (->tx-data form)})
                   (eval form))))
     :read clojure.core.server/repl-read))
+
+(comment
+  (let [db (d/db conn)
+        root :tg/node-19485]
+    (d/q '[:find [?form ...]
+           :in $ ?root
+           :where
+           [?e :grepl/root ?root]
+           [?e :grepl/form ?form]]
+         db root))
+
+  (def conn (d/connect db-uri))
+  (d/delete-database db-uri))

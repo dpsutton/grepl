@@ -8,18 +8,18 @@ nil
 user=> (grepl/grepl)
 user=> (let [f inc] (f 4))
 5
-user=> (:grepl/parent f)
+user=> (?grepl/parent f)
 [f inc]
 (f 4)
 nil
-user=> (:grepl/root f)
+user=> (?grepl/root f)
 (let [f inc] (f 4))
 nil
 user=> :repl/quit
 nil
 user=>
 ```
-To exit, just type `:repl/quit`.
+To exit, just type `:repl/quit`. If you want to clear the stored items in the repl history database, run `(?grepl/reset)`.
 
 ## Data storage
 
@@ -62,7 +62,7 @@ grepl.repl=> (pprint (->tx-data '(let [a 1 b 2] (+ a b)))) ;; quoted here since 
  [:db/add -11 :grepl/root -1])
 ```
 
-This tree-seq's the form, puts it in the database along with a pointer to its parent sexp and the root sexp. In this way if you did `(:grepl/parent b)` it will see two nodes who's value is `b` and get the parent form, yielding `[a 1 b 2]` (the binding form) and `(+ a b)` the addition form. If you query for the root form you would get the single `(let [a 1 b 2] (+ a b))` form.
+This tree-seq's the form, puts it in the database along with a pointer to its parent sexp and the root sexp. In this way if you did `(?grepl/parent b)` it will see two nodes who's value is `b` and get the parent form, yielding `[a 1 b 2]` (the binding form) and `(+ a b)` the addition form. If you query for the root form you would get the single `(let [a 1 b 2] (+ a b))` form.
 
 ## Limitations and Future work
 
@@ -75,4 +75,4 @@ At the moment it also doesn't limit the number of returned results. I need to ad
 ## Really cool things that could be added in the future
 
 - timing all top level forms automatically. Functionally wise, this should be easy. The top level form always has temp-id -1 and the transaction returns a map of temp-ids to actual ids. Just transact the top level form with a start time and add an end time and duration at the end
-- general purpose debugger: CIDER has a very neat debugger that instruments code. That could be used but just take out the interactivity of it and annotate each subform with it's value. Then have `(:grepl/annotate <form>)` use the debugger, compute all the subvalues, and then print out the form annotated with the intermediate values. I suspect the UI portion of this would be the hardest.
+- general purpose debugger: CIDER has a very neat debugger that instruments code. That could be used but just take out the interactivity of it and annotate each subform with it's value. Then have `(?grepl/annotate <form>)` use the debugger, compute all the subvalues, and then print out the form annotated with the intermediate values. I suspect the UI portion of this would be the hardest.
