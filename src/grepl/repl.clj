@@ -12,6 +12,12 @@
 
 (defn ->tx-data [form]
   (let [ids (atom 0)
+        branch? (fn [node]
+                  (and (seqable? node) (not (string? node))))
+        children (fn [node]
+                   (if (map? node)
+                     (concat (keys node) (vals node))
+                     (seq node)))
         ;; tree-seq but allowing us to annotate children with parent
         walk (fn walk [parent-id node]
                (let [id (swap! ids dec)]
@@ -20,9 +26,8 @@
                           :grepl/parent parent-id
                           :grepl/root -1
                           :db/id id}
-                         (when (seqable? node)
-                           (mapcat (partial walk id) (if (map? node) (concat (keys node) (vals node))
-                                                         (seq node))))))))
+                         (when (branch? node)
+                           (mapcat (partial walk id) (children node)))))))
         walked (walk -1 form)]
     (concat (map #(dissoc % :grepl/parent :grepl/root) walked)
             (mapcat (fn [node] [[:db/add (:db/id node) :grepl/parent (:grepl/parent node)]
